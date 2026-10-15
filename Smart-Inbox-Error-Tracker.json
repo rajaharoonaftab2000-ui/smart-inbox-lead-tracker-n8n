@@ -1,0 +1,52 @@
+{
+  "name": "Smart Inbox Error Tracker",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        -208
+      ],
+      "id": "c51dec4c-72ab-4fdf-806d-4e0604f2529b",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '🚨 Smart Inbox Workflow Error\\n\\n' + 'Workflow: ' + ($json.workflow?.name || 'Unknown') + '\\n' + 'Failed Node: ' + ($json.execution?.lastNodeExecuted || $json.trigger?.error?.node?.name || 'Unknown') + '\\n' + 'Error: ' + ($json.execution?.error?.message || $json.trigger?.error?.message || 'Unknown error') + '\\n\\n' + 'Please check the workflow in n8n.' }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -416,
+        -208
+      ],
+      "id": "590b4b37-ffcf-462b-a5fc-96284d6519fb",
+      "name": "Send a text message"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

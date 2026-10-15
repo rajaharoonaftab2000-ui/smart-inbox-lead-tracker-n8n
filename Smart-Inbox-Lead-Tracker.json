@@ -1,0 +1,592 @@
+{
+  "name": "Smart Inbox Lead Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1440,
+        -240
+      ],
+      "id": "af9894c1-0f14-423b-aaf0-dfee252cdb6c",
+      "name": "Gmail Trigger"
+    },
+    {
+      "parameters": {
+        "inputText": "={{ $json.snippet }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "Lead",
+              "description": "Emails from potential customers showing interest in buying or using our products or services. This includes requests for pricing, quotations, demos, consultations, or a new automation project, and questions about whether our services can help their business.  Examples: \"I need an automation for my company\", \"How much would this workflow cost?\", or \"Can you build this for my business?\"  Classify based on the sender's meaning and buying interest, even if the word \"lead\" is never mentioned. General educational questions without buying interest belong to Question. Problems or dissatisfaction with an existing service belong to Complaint."
+            },
+            {
+              "category": "Complaint",
+              "description": "Emails reporting a problem or expressing dissatisfaction with an existing product, service, or order. Includes services not working, delays, poor quality, billing errors, and refund requests related to a problem.  Examples: \"My automation has stopped working\" or \"I paid for the service but it has not been delivered.\""
+            },
+            {
+              "category": "Question",
+              "description": "Emails asking for general information, explanations, or guidance without clear interest in purchasing a service and without reporting a problem.  Examples: \"What is automation?\" or \"How does Gmail integration work?\" Requests for pricing, quotations, or a new business project belong to Lead."
+            },
+            {
+              "category": "Spam",
+              "description": "Unsolicited and irrelevant promotional emails, scams, phishing attempts, suspicious links, or fake prize messages. Do not classify genuine customer inquiries or complaints as spam.  Examples: \"You won a lottery. Click here to claim your prize\" or an unrelated advertisement."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "typeVersion": 1.1,
+      "position": [
+        -1232,
+        -272
+      ],
+      "id": "64885e20-dbe2-4fef-b30d-a653bfe49224",
+      "name": "Text Classifier"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1232,
+        0
+      ],
+      "id": "e8f12921-65d5-43c4-b6cd-0430263a5a41",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.snippet }}",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "name",
+              "description": "The customer's name ecplicity mentioned in the email. Do not invent a name."
+            },
+            {
+              "name": "email",
+              "description": "The customer's contact email explicity mentioned in the text. Do not invent an email address."
+            },
+            {
+              "name": "phone",
+              "description": "the customer's phone number mentioned in the email, including country code if provided. "
+            },
+            {
+              "name": "requirements ",
+              "description": "A short summary of the product or service the customer wants."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        -720,
+        -576
+      ],
+      "id": "b1eb8b99-31f6-402e-9c7d-86fc231beb14",
+      "name": "Information Extractor"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        -464
+      ],
+      "id": "73399242-12e8-458e-946e-c67e23ff6fac",
+      "name": "Google Gemini Chat Model1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b004fe2d-df8e-46e4-a625-1760d02eee93",
+              "name": "email",
+              "value": "={{ $('Gmail Trigger').item.json.From.match(/<([^>]+)>/)?.[1]?.trim().toLowerCase() || $('Gmail Trigger').item.json.From.trim().toLowerCase() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -400,
+        -576
+      ],
+      "id": "7514f2fd-9854-4f8d-ad50-e12be42f68dd",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.email }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        -576
+      ],
+      "id": "3229611f-54f4-4bf5-bd28-7f9d2cf5fb65",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Requirements": "={{ $json.output['requirements '] }}",
+            "Email": "={{ $json.email }}",
+            "Name": "={{ $json.output.name || '' }}",
+            "Phone Number": "={{ $json.output.phone || '' }}",
+            "Status": "New",
+            "Received At": "={{ DateTime.fromMillis(Number($('Gmail Trigger').item.json.internalDate)).setZone('Asia/Karachi').toISO() }}",
+            "Follow Up At": "={{ $now.setZone('Asia/Karachi').plus({ days: 1 }).toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone Number",
+              "displayName": "Phone Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Requirements",
+              "displayName": "Requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Follow Up At",
+              "displayName": "Follow Up At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Received At",
+              "displayName": "Received At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        -576
+      ],
+      "id": "ea0e1d18-d81f-40de-9510-9c0710303201",
+      "name": "Append row in sheet"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        -576
+      ],
+      "id": "8bc4f682-ce7b-464f-b25b-25e40648e05e",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '🔔 Lead Follow-up Reminder\\n\\n' +\n'Email: ' + $('Edit Fields').item.json.email + '\\n' +\n'Requirement: ' + ($('Edit Fields').item.json.output['requirements '] || '') + '\\n\\n' +\n'This lead is due for follow-up. If you have not replied yet, please contact the customer.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        368,
+        -576
+      ],
+      "id": "c4e4b844-4870-4b0f-a4a0-1f50bdaab28a",
+      "name": "Send a text message"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '🚨 New Complaint Received\\n\\n' + 'From: ' + $json.From + '\\n' + 'Subject: ' + $json.Subject + '\\n\\n' + 'Message: ' + $json.snippet + '\\n\\n' + 'Please review this complaint as soon as possible.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -496,
+        -400
+      ],
+      "id": "3f5db663-7290-4c1a-b5c7-69b7462d5205",
+      "name": "Send a text message1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'Write a professional English email reply draft to the customer question below.\\n\\n' +\n'Answer clearly and briefly. Do not invent prices, policies, service details, or promises. If information is missing, ask for clarification. Return only the email body, without a subject line.\\n\\n' +\n'Subject: ' + $json.Subject + '\\n' +\n'Customer message: ' + $json.snippet }}",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -816,
+        -32
+      ],
+      "id": "4cbd46b1-bd4c-491d-93bc-cf2a99d32174",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -816,
+        144
+      ],
+      "id": "5a19ace7-5c13-461b-89c4-6e3127144f0c",
+      "name": "Google Gemini Chat Model2"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ 'Re: ' + $('Gmail Trigger').item.json.Subject }}",
+        "message": "={{ $json.text }}",
+        "options": {
+          "sendTo": "={{ $('Gmail Trigger').item.json.From.match(/<([^>]+)>/)?.[1] || $('Gmail Trigger').item.json.From }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -464,
+        -32
+      ],
+      "id": "96cecc41-6085-4a8c-aa50-0bfdd6aebee1",
+      "name": "Create a draft"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Complaints",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Subject ": "={{ $json.Subject }}",
+            "Complaint": "={{ $json.snippet }}",
+            "Status": "New",
+            "Received At": "={{ DateTime.fromMillis(Number($json.internalDate)).setZone('Asia/Karachi').toISO() }}",
+            "Email": "={{ $json.From.match(/<([^>]+)>/)?.[1]?.trim().toLowerCase() || $json.From.trim().toLowerCase() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Subject ",
+              "displayName": "Subject ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Complaint",
+              "displayName": "Complaint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Received At",
+              "displayName": "Received At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -496,
+        -224
+      ],
+      "id": "80b6b66d-d52e-48c9-b4eb-bd7a2eb7c082",
+      "name": "Append row in sheet1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Text Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Text Classifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Classifier": {
+      "main": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Information Extractor": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
