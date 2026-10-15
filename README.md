@@ -139,7 +139,7 @@ Before testing:
 
 ## Demo Video
 
-[Watch the Smart Inbox Lead Tracker Demo](./Smart-Inbox-Jacob-English-Voiceover.mp4)
+[Watch the Smart Inbox Lead Tracker Demo](./Smart-Inbox-Silent-Captions.mp4)
 
 ## Project Status
 
